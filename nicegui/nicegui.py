@@ -172,6 +172,7 @@ async def _on_handshake(sid: str, data: Dict[str, Any]) -> bool:
     await sio.enter_room(sid, client.id)
     if not client.outbox.synchronize(data['last_message_id'], data['retransmit_id']):
         return False
+    print(f'{sid}')
     client.handle_handshake()
     return True
 

@@ -289,7 +289,9 @@ function createApp(elements, options) {
       window.clientId = options.query.client_id;
       const url = window.location.protocol === "https:" ? "wss://" : "ws://" + window.location.host;
       window.path_prefix = options.prefix;
-      window.last_message_id = options.query.starting_message_id;
+      window.lastMessageId = options.query.starting_message_id;
+      window.synced = false;
+      window.autoDisconnect = true;
       window.socket = io(url, {
         path: `${options.prefix}/_nicegui_ws/socket.io`,
         query: options.query,
@@ -307,7 +309,7 @@ function createApp(elements, options) {
           const args = {
             client_id: window.clientId,
             tab_id: tabId,
-            last_message_id: window.last_message_id,
+            last_message_id: window.lastMessageId,
             retransmit_id: window.retransmitId,
           };
           window.socket.emit("handshake", args, (ok) => {
@@ -316,6 +318,14 @@ function createApp(elements, options) {
               window.location.reload();
             }
             document.getElementById("popup").ariaHidden = true;
+            setTimeout(() => {
+              if (window.autoDisconnect) {
+                window.socket.disconnect();
+                setTimeout(() => {
+                  window.socket.connect();
+                }, Math.floor(Math.random() * 10) * 1000);
+              }
+            }, Math.floor(Math.random() * 60) * 1000);
           });
         },
         connect_error: (err) => {
@@ -332,6 +342,7 @@ function createApp(elements, options) {
         },
         disconnect: () => {
           document.getElementById("popup").ariaHidden = false;
+          window.synced = false;
         },
         update: async (msg) => {
           for (const [id, element] of Object.entries(msg)) {
@@ -354,38 +365,59 @@ function createApp(elements, options) {
         },
         download: (msg) => download(msg.src, msg.filename, msg.media_type, options.prefix),
         notify: (msg) => Quasar.Notify.create(msg),
+        retransmit: (msg) => {
+          //   console.log(`retransmit: ${msg}`, msg);
+          window.synced = true;
+          if (msg.retransmit_id == window.retransmitId) {
+            msg.messages.forEach((message, i) => {
+              //   console.log(`forEach: `);
+              //   message[1].message_id = msg.starting_message_id + i;
+              console.log(message[1].message_id);
+              ybr[message[0]](message[1]);
+            });
+            // window.lastMessageId += msg.messages.length;
+            console.log(`window.synced: ${window.synced}`);
+          }
+        },
       };
       const socketMessageQueue = [];
       let isProcessingSocketMessage = false;
+      let ybr = {};
       for (const [event, handler] of Object.entries(messageHandlers)) {
-        window.socket.on(event, async (...args) => {
-          if (args.length > 0 && args[0].hasOwnProperty("message_id")) {
-            const data = args[0];
-            if (
-              data.message_id <= window.last_message_id ||
-              ("retransmit_id" in data && data.retransmit_id != window.retransmitId)
-            ) {
-              return;
-            }
-            window.last_message_id = data.message_id;
-            delete data.message_id;
-            delete data.retransmit_id;
-          }
+        let sca = async (...args) => {
+          //   if (args.length > 1 && args[1].hasOwnProperty("message_id")) {
+          //   console.log(`window.socket.on: ${event}`, args);
 
+          const data = args[0];
+          //   if (!window.synced && event != "retransmit" && data && data.hasOwnProperty("message_id")) {
+          //     return;
+          //   }
+          //   console.log(`kkk: `, data);
+          if (data && data.hasOwnProperty("message_id")) {
+            window.lastMessageId = data.message_id;
+            delete data.message_id;
+          }
+          // delete data.retransmit_id;
+          //   }
           socketMessageQueue.push(() => handler(...args));
           if (!isProcessingSocketMessage) {
             while (socketMessageQueue.length > 0) {
               const handler = socketMessageQueue.shift();
               isProcessingSocketMessage = true;
               try {
-                await handler();
+                // console.log(`handler: ${args}`);
+                setTimeout(async () => {
+                  await handler();
+                }, 0);
               } catch (e) {
                 console.error(e);
               }
               isProcessingSocketMessage = false;
             }
           }
-        });
+        };
+        window.socket.on(event, sca);
+        ybr[event] = sca;
       }
     },
   }).use(Quasar, {

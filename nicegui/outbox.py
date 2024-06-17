@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import time
 from collections import deque
 from typing import TYPE_CHECKING, Any, Deque, Dict, Optional, Tuple
@@ -76,21 +77,35 @@ class Outbox:
 
     def synchronize(self, last_message_id: int, retransmit_id: str) -> bool:
         """Synchronize the state of a connecting client by resending missed messages, if possible."""
+        print(len(self._history), len(self.messages), len(self.updates))
+        print(f'lmi: {last_message_id}')
+        dmi = None
         if self._history:
             next_id = last_message_id + 1
             oldest_id = self._history[0][0]
             if oldest_id > next_id:
+
                 return False
 
             start = next_id - oldest_id
-            for i in range(start, len(self._history)):
-                args = self._history[i][2]
-                args[1]['retransmit_id'] = retransmit_id
-                self.enqueue_message('retransmit', args, '')
+            dmi = [msg for _, _, msg in itertools.islice(self._history, start, len(self._history))]
+            # print(dmi)
+
+            self.enqueue_message('retransmit',
+                                 {'starting_message_id': next_id, 'messages': dmi, 'retransmit_id': retransmit_id},
+                                 self.client.id)
+
+            # for i in range(start, len(self._history)):
+            #     args = self._history[i][2]
+            #     args[1]['retransmit_id'] = retransmit_id
+            #     self.enqueue_message('retransmit', args, '')
 
         elif last_message_id != self._message_count:
             return False
-
+        if not dmi:
+            self.enqueue_message('retransmit',
+                                 {'starting_message_id': self._message_count, 'messages': [], 'retransmit_id': retransmit_id},
+                                 self.client.id)
         return True
 
     async def loop(self) -> None:
@@ -141,7 +156,9 @@ class Outbox:
             self._append_history(message_type, data, target_id)
             data['message_id'] = self._message_count
         else:
-            message_type, data, target_id = data
+            # message_type, data, target_id = data
+            print('ssssssssssssssss')
+            pass
 
         await core.sio.emit(message_type, data, room=target_id)
         if core.air is not None and core.air.is_air_target(target_id):
