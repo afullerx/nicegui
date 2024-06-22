@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import itertools
 import time
 from collections import deque
 from typing import TYPE_CHECKING, Any, Deque, Dict, Optional, Tuple
@@ -33,6 +32,7 @@ class Outbox:
         self._stats = {"appendTime": 0, "count": 0, "min": 9999999999999999, "max": 0}
         # self._history_init: bool = False
         self._history_duration: Optional[float] = None
+        self._history_max_length: int = 0
         # print(f'out: {self.client.page.resolve_reconnect_timeout()}')
         if core.app.is_started:
             background_tasks.create(self.loop(), name=f'outbox loop {client.id}')
@@ -75,12 +75,15 @@ class Outbox:
                 dt = core.sio.eio.ping_interval + core.sio.eio.ping_timeout + self.client.page.resolve_reconnect_timeout()
                 print(f'dt: {dt}')
                 self._history_duration = dt
+            self._history_max_length = core.app.config.message_history_max
             print(f'_history_duration: {self._history_duration}')
+            print(f'_history_max_len {self._history_max_length}')
             # self._history_init = True
 
         self._message_count += 1
         timestamp = time.time()
-        while self._history and (self._history[0][1] < timestamp - self._history_duration or len(self._history) > 1000000):
+        while self._history and (self._history[0][1] < timestamp - self._history_duration or
+                                 len(self._history) > self._history_max_length):
             self._history.popleft()
         self._history.append((self._message_count, timestamp, (message_type, data, target)))
         if len(self._history) % 1000 == 0:
@@ -96,12 +99,10 @@ class Outbox:
             next_id = last_message_id + 1
             oldest_id = self._history[0][0]
             if oldest_id > next_id:
-
                 return False
 
             start = next_id - oldest_id
             st = time.perf_counter()
-            messages = []
             for i in range(start, len(self._history)):
                 # args = self._history[i][2]
                 # args[1]['retransmit_id'] = retransmit_id

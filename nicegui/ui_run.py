@@ -47,6 +47,7 @@ def run(*,
         endpoint_documentation: Literal['none', 'internal', 'page', 'all'] = 'none',
         storage_secret: Optional[str] = None,
         show_welcome_message: bool = True,
+        message_history_max: int = 100,
         **kwargs: Any,
         ) -> None:
     """ui.run
@@ -80,6 +81,7 @@ def run(*,
     :param storage_secret: secret key for browser-based storage (default: `None`, a value is required to enable ui.storage.individual and ui.storage.browser)
     :param show_welcome_message: whether to show the welcome message (default: `True`)
     :param kwargs: additional keyword arguments are passed to `uvicorn.run`
+    :param message_history_duration: (default: 30)
     """
     core.app.config.add_run_config(
         reload=reload,
@@ -93,6 +95,7 @@ def run(*,
         tailwind=tailwind,
         prod_js=prod_js,
         show_welcome_message=show_welcome_message,
+        message_history_max=message_history_max,
     )
     core.app.config.endpoint_documentation = endpoint_documentation
 

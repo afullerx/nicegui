@@ -273,6 +273,30 @@ function createRandomUUID() {
   }
 }
 
+function processMessageId(event, message) {
+  const msgId = message.message_id;
+  delete message.message_id;
+  delete message.history;
+
+  if (document.title === "XX") {
+    return;
+  }
+  if (msgId <= window.lastMessageId) {
+    console.log(`redundant: ${msgId}`, message);
+    le(msg);
+    document.title = "XX";
+    return;
+  }
+  if (msgId != window.lastMessageId + 1) {
+    console.log(`gap detected: ${msgId} -- ${window.lastMessageId}`);
+    le(message);
+    document.title = "XX";
+    return;
+  }
+  window.lastMessageId = msgId;
+  return true;
+}
+
 function createApp(elements, options) {
   replaceUndefinedAttributes(elements, 0);
   return (app = Vue.createApp({
@@ -290,8 +314,11 @@ function createApp(elements, options) {
       const url = window.location.protocol === "https:" ? "wss://" : "ws://" + window.location.host;
       window.path_prefix = options.prefix;
       window.lastMessageId = options.query.starting_message_id;
-      window.synced = false;
+      console.log(`options.query.starting_message_id: ${options.query.starting_message_id}`);
+      window.syncing = true;
       window.autoDisconnect = true;
+      window.syncingQue = [];
+
       window.socket = io(url, {
         path: `${options.prefix}/_nicegui_ws/socket.io`,
         query: options.query,
@@ -318,14 +345,29 @@ function createApp(elements, options) {
               window.location.reload();
             }
             document.getElementById("popup").ariaHidden = true;
+            let mqf = Math.floor(Math.random() * 30 * 1000 + 1);
             setTimeout(() => {
-              if (window.autoDisconnect) {
-                window.socket.disconnect();
-                setTimeout(() => {
-                  window.socket.connect();
-                }, Math.floor(Math.random() * 10) * 1000);
+              if (document.title === "XX") {
+                return;
               }
-            }, Math.floor(Math.random() * 60) * 1000);
+
+              if (window.autoDisconnect) {
+                window.txr = Math.floor(Math.random() * 10) * 1000;
+                console.log(`============== Planned disconnect: ${window.txr}`);
+                if (window.autoDisconnect) {
+                  //   window.autoDisconnect = false;
+                  window.socket.disconnect();
+                  setTimeout(() => {
+                    if (document.title === "XX") {
+                      return;
+                    }
+
+                    window.socket.connect();
+                  }, window.txr);
+                }
+              }
+            }, mqf);
+            // ===============================
           });
         },
         connect_error: (err) => {
@@ -342,7 +384,7 @@ function createApp(elements, options) {
         },
         disconnect: () => {
           document.getElementById("popup").ariaHidden = false;
-          window.synced = false;
+          window.syncing = true;
         },
         update: async (msg) => {
           for (const [id, element] of Object.entries(msg)) {
@@ -365,50 +407,121 @@ function createApp(elements, options) {
         },
         download: (msg) => download(msg.src, msg.filename, msg.media_type, options.prefix),
         notify: (msg) => Quasar.Notify.create(msg),
-        retransmit: (msg) => {
-          //   console.log(`retransmit: ${msg}`, msg);
-          window.synced = true;
+        syncronize: (msg) => {
+          window.autoDisconnect = true;
+
           if (msg.retransmit_id == window.retransmitId) {
-            msg.messages.forEach((message, i) => {
-              //   console.log(`forEach: `);
-              //   message[1].message_id = msg.starting_message_id + i;
-              console.log(message[1].message_id);
-              ybr[message[0]](message[1]);
-            });
-            // window.lastMessageId += msg.messages.length;
-            console.log(`window.synced: ${window.synced}`);
+            // document.getElementById("c5").style.color = "red";
+
+            let msgs = msg.messages.concat(window.syncingQue);
+            let red = false;
+            let xvo = 0;
+            let startTime = null;
+            let startCount = null;
+
+            startCount = xvo;
+            startTime = performance.now();
+
+            // msg.messages.concat(window.syncingQue).forEach(async (message, i) => {
+            var len = msgs.length;
+            let i = 0;
+            while (i < len) {
+              if (document.title === "XX") {
+                return;
+              }
+              xvo++;
+
+              msgs[i][1].history = i;
+              if (!processMessageId(msgs[i][0], msgs[i][1])) {
+                return;
+              }
+              messageHandlers[msgs[i][0]](msgs[i][1]);
+              //   wrappedHandlers[message[0]](message[1]);
+              //   await new Promise((r) => setTimeout(r, 3));
+              // }, 0);
+              //   if (!getElementById("yui")) {
+              //     var elem = document.createElement("div");
+              //     elem.id = "yui";
+              //     document.body.appendChild(elem);
+              //   }
+              // });
+              i++;
+            }
+            let now = performance.now();
+            let msg_count = xvo - startCount;
+            let t = now - startTime;
+            // document.getElementById("c5").style.color = "black";
+
+            console.log(`msgs: ${msg_count}`);
+            console.log(`msgs/s: ${(msg_count / window.txr) * 1000}`);
+            console.log(`time: ${t}`);
+            console.log(`/s: ${t / msg_count}`);
+
+            console.log(`ret: ${msg.messages.length}`);
+            console.log(`smi: ${window.lastMessageId}`);
+            console.log(`syc: ${window.syncingQue.length}`);
+            console.log(`xoj: ${msgs.length}`);
+
+            window.syncingQue = [];
+            // console.log(`window.syncing: ${window.syncing}`);
+            window.syncing = false;
           }
         },
       };
       const socketMessageQueue = [];
       let isProcessingSocketMessage = false;
-      let ybr = {};
+      let wrappedHandlers = {};
+      //   let haveIds = { update: true, run_javascript: true, open: true, download: true, notify: truetry_reconnect: true };
+      let noMessageId = { connect: true, connect_error: true, disconnect: true, syncronize: true };
       for (const [event, handler] of Object.entries(messageHandlers)) {
-        let sca = async (...args) => {
-          //   if (args.length > 1 && args[1].hasOwnProperty("message_id")) {
-          //   console.log(`window.socket.on: ${event}`, args);
-
-          const data = args[0];
-          //   if (!window.synced && event != "retransmit" && data && data.hasOwnProperty("message_id")) {
-          //     return;
-          //   }
-          //   console.log(`kkk: `, data);
-          if (data && data.hasOwnProperty("message_id")) {
-            window.lastMessageId = data.message_id;
-            delete data.message_id;
+        const queueWrapper = async (...args) => {
+          if (args.length > 0 && args[0].hasOwnProperty("message_id")) {
+            if (window.syncing && args[0].message_id != window.lastMessageId + 1) {
+              // console.log(`syncingQue.push: ${msgId}`, message);
+              window.syncingQue.push([event, args[0]]);
+              return;
+            } else {
+              if (!processMessageId(event, args[0])) {
+                return;
+              }
+            }
           }
-          // delete data.retransmit_id;
-          //   }
+
+          let red = false;
+          let xvo = 0;
+          let startTime = null;
+          let startCount = null;
+
           socketMessageQueue.push(() => handler(...args));
           if (!isProcessingSocketMessage) {
             while (socketMessageQueue.length > 0) {
+              xvo++;
+              if (!red && socketMessageQueue.length > 3) {
+                startCount = xvo;
+                startTime = performance.now();
+                red = true;
+                document.getElementsByClassName("msgzzz")[0].style.color = "red";
+                console.log(`^^^^^^^^^^^^^^^^^^^ red: ${0}`);
+              } else if (red && socketMessageQueue.length == 1) {
+                let now = performance.now();
+                let msgs = xvo - startCount - 1;
+                let t = now - startTime;
+                console.log(`msgs: ${msgs}`);
+                console.log(`time: ${t}`);
+                console.log(`/s: ${t / msgs}`);
+                red = false;
+                console.log(`^^^^^^^^^^^^^^^^^^^ black: ${0}`);
+                document.getElementsByClassName("msgzzz")[0].style.color = "black";
+              }
               const handler = socketMessageQueue.shift();
               isProcessingSocketMessage = true;
               try {
                 // console.log(`handler: ${args}`);
-                setTimeout(async () => {
-                  await handler();
-                }, 0);
+                await handler();
+                // if (red && performance.now() - startTime > 50) {
+                if (xvo % 10 === 0) {
+                  await new Promise((r) => setTimeout(r, 100));
+                }
               } catch (e) {
                 console.error(e);
               }
@@ -416,11 +529,45 @@ function createApp(elements, options) {
             }
           }
         };
-        window.socket.on(event, sca);
-        ybr[event] = sca;
+        if (!true) {
+          const idWrapper = async (...args) => {
+            const data = args[0];
+            // if (data && data.hasOwnProperty("message_id")) {
+            if (document.title === "XX") {
+              return;
+            }
+            if (window.syncing) {
+              window.syncingQue.push([event, data]);
+              return;
+            } else {
+              console.log(`: ${data.message_id}`);
+              if (data.message_id != window.lastMessageId + 1) {
+                console.log(`gap detected: ${data.message_id} -- ${window.lastMessageId}`);
+                document.title = "XX";
+              }
+              window.lastMessageId = data.message_id;
+              delete data.message_id;
+            }
+
+            // }
+            queueWrapper(...args);
+          };
+          wrappedHandlers[event] = idWrapper;
+          window.socket.on(event, idWrapper);
+        } else {
+          window.socket.on(event, queueWrapper);
+          wrappedHandlers[event] = queueWrapper;
+        }
       }
     },
   }).use(Quasar, {
     config: options.quasarConfig,
   }));
+}
+function le(msg) {
+  console.log(`@@@@@@@@@@@@@@@@@@@@: ${0}`);
+  if ("history" in msg) {
+    console.log(`history: ${msg.history}`);
+  }
+  // console.log(`index: ${msg.iindex}`);
 }
