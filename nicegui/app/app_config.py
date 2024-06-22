@@ -35,6 +35,7 @@ class AppConfig:
     tailwind: bool = field(init=False)
     prod_js: bool = field(init=False)
     show_welcome_message: bool = field(init=False)
+    message_history_max: int = field(init=False)
     _has_run_config: bool = False
 
     def add_run_config(self,
@@ -50,6 +51,7 @@ class AppConfig:
                        tailwind: bool,
                        prod_js: bool,
                        show_welcome_message: bool,
+                       message_history_max: int,
                        ) -> None:
         """Add the run config to the app config."""
         self.reload = reload
@@ -63,6 +65,7 @@ class AppConfig:
         self.tailwind = tailwind
         self.prod_js = prod_js
         self.show_welcome_message = show_welcome_message
+        self.message_history_max = message_history_max
         self._has_run_config = True
 
     @property
