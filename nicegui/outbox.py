@@ -29,7 +29,9 @@ class Outbox:
         self._enqueue_event: Optional[asyncio.Event] = None
         self._history: Deque[Tuple[int, float, Tuple[MessageType, Any, ClientId]]] = deque()
         self._message_count: int = 0
+        self._message_queue_count: int = 0
         self._stats = {"appendTime": 0, "count": 0, "min": 9999999999999999, "max": 0}
+        self._skip_round = False
         # self._history_init: bool = False
         self._history_duration: Optional[float] = None
         self._history_max_length: int = 0
@@ -42,7 +44,18 @@ class Outbox:
     @property
     def message_count(self) -> int:
         """Total number of messages sent."""
-        return self._message_count
+        if self.updates:
+            data = {
+                element_id: None if element is None else element._to_dict()  # pylint: disable=protected-access
+                for element_id, element in self.updates.items()
+            }
+            # self.enqueue_message('update', data, self.client.id)
+            self.messages.appendleft((self.client.id, 'update', data))
+            self._message_queue_count += 1
+            self.updates.clear()
+            self._skip_round = True
+        print(f'8888888888888: {len(self.messages)}')
+        return self._message_count + self._message_queue_count
 
     def _set_enqueue_event(self) -> None:
         """Set the enqueue event while accounting for lazy initialization."""
@@ -65,6 +78,7 @@ class Outbox:
         """Enqueue a message for the given client."""
         self.client.check_existence()
         self.messages.append((target_id, message_type, data))
+        self._message_queue_count += 1
         self._set_enqueue_event()
 
     def _append_history(self, message_type: MessageType, data: Any, target: ClientId) -> None:
@@ -153,7 +167,7 @@ class Outbox:
                 self._enqueue_event.clear()
 
                 coros = []
-                if self.updates:
+                if self.updates and not self._skip_round:
                     data = {
                         element_id: None if element is None else element._to_dict()  # pylint: disable=protected-access
                         for element_id, element in self.updates.items()
@@ -165,12 +179,15 @@ class Outbox:
                     for target_id, message_type, data in self.messages:
                         coros.append(self._emit(message_type, data, target_id))
                     self.messages.clear()
+                    self._message_queue_count = 0
 
                 for coro in coros:
                     try:
                         await coro
                     except Exception as e:
                         core.app.handle_exception(e)
+
+                self._skip_round = False
 
             except Exception as e:
                 core.app.handle_exception(e)
