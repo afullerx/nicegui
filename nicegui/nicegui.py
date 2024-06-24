@@ -170,7 +170,7 @@ async def _on_handshake(sid: str, data: Dict[str, Any]) -> bool:
     client.environ = sio.get_environ(sid)
     client.tab_id = data['tab_id']
     await sio.enter_room(sid, client.id)
-    if not client.outbox.synchronize(data['last_message_id'], data['retransmit_id']):
+    if not await client.outbox.synchronize(data['last_message_id'], data['retransmit_id']):
         print(f'handle_handshake: {False}')
         return False
     # print(f'{sid}')
