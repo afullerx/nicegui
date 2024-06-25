@@ -332,41 +332,53 @@ function createApp(elements, options) {
             tabId = createRandomUUID();
             sessionStorage.setItem("__nicegui_tab_id", tabId);
           }
-          window.retransmitId = createRandomUUID();
+          window.syncId = createRandomUUID();
           const args = {
             client_id: window.clientId,
             tab_id: tabId,
             last_message_id: window.lastMessageId,
-            retransmit_id: window.retransmitId,
+            sync_id: window.syncId,
           };
-          window.socket.emit("handshake", args, (ok) => {
-            if (!ok) {
+          window.socket.emit("handshake", args, (res) => {
+            if (!res.success && res.reason === "no_client_id") {
               console.log("reloading because handshake failed for clientId " + window.clientId);
               window.location.reload();
+            } else if (!res.success && res.reason === "sync_failure") {
+              window.syncFailures++;
+              sessionStorage.setItem("__nicegui_sync_failures", window.syncFailures);
+              alert("sync_failure");
+              console.log(`sync_failure: ${res}`);
+              if (window.syncFailures <= 3) {
+                window.location.reload();
+              }
             }
+            window.initialConnection = false;
+
             document.getElementById("popup").ariaHidden = true;
+
+            //===================================
             let mqf = Math.floor(Math.random() * 30 * 1000 + 1);
-            // setTimeout(() => {
-            //   if (document.title === "XX") {
-            //     return;
-            //   }
+            setTimeout(() => {
+              if (document.title === "XX") {
+                return;
+              }
 
-            //   if (window.autoDisconnect) {
-            //     window.txr = Math.floor(Math.random() * 10) * 1000;
-            //     console.log(`============== Planned disconnect: ${window.txr}`);
-            //     if (window.autoDisconnect) {
-            //       //   window.autoDisconnect = false;
-            //       window.socket.disconnect();
-            //       setTimeout(() => {
-            //         if (document.title === "XX") {
-            //           return;
-            //         }
+              if (window.autoDisconnect) {
+                window.txr = Math.floor(Math.random() * 10) * 1000;
+                console.log(`============== Planned disconnect: ${window.txr}`);
+                if (window.autoDisconnect) {
+                  //   window.autoDisconnect = false;
+                  window.socket.disconnect();
+                  setTimeout(() => {
+                    if (document.title === "XX") {
+                      return;
+                    }
 
-            //         window.socket.connect();
-            //       }, window.txr);
-            //     }
-            //   }
-            // }, mqf);
+                    window.socket.connect();
+                  }, window.txr);
+                }
+              }
+            }, mqf);
             // ===============================
           });
         },
@@ -410,19 +422,11 @@ function createApp(elements, options) {
         syncronize: (msg) => {
           window.autoDisconnect = true;
 
-          if (msg.retransmit_id == window.retransmitId) {
+          if (msg.sync_id == window.sync_id) {
             const timestamp = Date.now();
             if (document.title === "XX") {
               return;
             }
-            if (msg.elements) {
-              replaceUndefinedAttributes(msg.elements, 0);
-              this.elements = msg.elements;
-              window.lastMessageId = msg.starting_message_id;
-              //   createApp(elements, options)
-              msg.messages = [];
-            }
-            // document.getElementById("c5").style.color = "red";
 
             let msgs = msg.messages.concat(window.syncingQue);
             console.log(`msgs: ${""}`, msgs);
@@ -434,7 +438,6 @@ function createApp(elements, options) {
             startCount = xvo;
             startTime = performance.now();
 
-            // msg.messages.concat(window.syncingQue).forEach(async (message, i) => {
             var len = msgs.length;
             let i = 0;
             while (i < len) {
@@ -478,14 +481,10 @@ function createApp(elements, options) {
       };
       const socketMessageQueue = [];
       let isProcessingSocketMessage = false;
-      let wrappedHandlers = {};
-      //   let haveIds = { update: true, run_javascript: true, open: true, download: true, notify: truetry_reconnect: true };
-      let noMessageId = { connect: true, connect_error: true, disconnect: true, syncronize: true };
       for (const [event, handler] of Object.entries(messageHandlers)) {
-        const queueWrapper = async (...args) => {
+        window.socket.on(event, async (...args) => {
           if (args.length > 0 && args[0].hasOwnProperty("message_id")) {
             if (window.syncing && args[0].message_id != window.lastMessageId + 1) {
-              // console.log(`syncingQue.push: ${msgId}`, message);
               window.syncingQue.push([event, args[0]]);
               return;
             } else {
@@ -495,76 +494,20 @@ function createApp(elements, options) {
             }
           }
 
-          let red = false;
-          let xvo = 0;
-          let startTime = null;
-          let startCount = null;
-
           socketMessageQueue.push(() => handler(...args));
           if (!isProcessingSocketMessage) {
             while (socketMessageQueue.length > 0) {
-              xvo++;
-              if (!red && socketMessageQueue.length > 3) {
-                startCount = xvo;
-                startTime = performance.now();
-                red = true;
-                document.getElementsByClassName("msgzzz")[0].style.color = "red";
-                console.log(`^^^^^^^^^^^^^^^^^^^ red: ${0}`);
-              } else if (red && socketMessageQueue.length == 1) {
-                let now = performance.now();
-                let msgs = xvo - startCount - 1;
-                let t = now - startTime;
-                console.log(`msgs: ${msgs}`);
-                console.log(`time: ${t}`);
-                console.log(`/s: ${t / msgs}`);
-                red = false;
-                console.log(`^^^^^^^^^^^^^^^^^^^ black: ${0}`);
-                document.getElementsByClassName("msgzzz")[0].style.color = "black";
-              }
               const handler = socketMessageQueue.shift();
               isProcessingSocketMessage = true;
               try {
-                // console.log(`handler: ${args}`);
                 await handler();
-                // if (red && performance.now() - startTime > 50) {
-                if (xvo % 10 === 0) {
-                  await new Promise((r) => setTimeout(r, 100));
-                }
               } catch (e) {
                 console.error(e);
               }
               isProcessingSocketMessage = false;
             }
           }
-        };
-        if (!true) {
-          //   const idWrapper = async (...args) => {
-          //     const data = args[0];
-          //     // if (data && data.hasOwnProperty("message_id")) {
-          //     if (document.title === "XX") {
-          //       return;
-          //     }
-          //     if (window.syncing) {
-          //       window.syncingQue.push([event, data]);
-          //       return;
-          //     } else {
-          //       console.log(`: ${data.message_id}`);
-          //       if (data.message_id != window.lastMessageId + 1) {
-          //         console.log(`gap detected: ${data.message_id} -- ${window.lastMessageId}`);
-          //         document.title = "XX";
-          //       }
-          //       window.lastMessageId = data.message_id;
-          //       delete data.message_id;
-          //     }
-          //     // }
-          //     queueWrapper(...args);
-          //   };
-          //   wrappedHandlers[event] = idWrapper;
-          //   window.socket.on(event, idWrapper);
-        } else {
-          window.socket.on(event, queueWrapper);
-          wrappedHandlers[event] = queueWrapper;
-        }
+        });
       }
     },
   }).use(Quasar, {

@@ -31,11 +31,9 @@ class Outbox:
         self._message_count: int = 0
         self._retransmit_count: int = 0
         self._stats = {"appendTime": 0, "count": 0, "min": 9999999999999999, "max": 0}
-        self._skip_updates = False
-        # self._history_init: bool = False
         self._history_duration: Optional[float] = None
         self._history_max_length: int = 0
-        # print(f'out: {self.client.page.resolve_reconnect_timeout()}')
+
         if core.app.is_started:
             background_tasks.create(self.loop(), name=f'outbox loop {client.id}')
         else:
@@ -43,18 +41,8 @@ class Outbox:
 
     @property
     def message_count(self) -> int:
-        """Total number of messages queued."""
-        if self.updates:
-            data = {
-                element_id: None if element is None else element._to_dict()  # pylint: disable=protected-access
-                for element_id, element in self.updates.items()
-            }
-            # self.enqueue_message('update', data, self.client.id)
-            self.messages.append((self.client.id, 'update', data))
-            self.updates.clear()
-            self._skip_updates = True
-        print(f'8888888888888: {len(self.messages)}')
-        return self._message_count + len(self.messages) - self._retransmit_count
+        """Total number of messages sent."""
+        return self._message_count
 
     def _set_enqueue_event(self) -> None:
         """Set the enqueue event while accounting for lazy initialization."""
@@ -90,7 +78,6 @@ class Outbox:
             self._history_max_length = core.app.config.message_history_max
             print(f'_history_duration: {self._history_duration}')
             print(f'_history_max_len {self._history_max_length}')
-            # self._history_init = True
 
         self._message_count += 1
         timestamp = time.time()
@@ -107,49 +94,31 @@ class Outbox:
         print(f'lmi: {last_message_id}')
 
         messages = []
-        elements = None
-        olf = self._message_count
         if self._history:
             next_id = last_message_id + 1
             oldest_id = self._history[0][0]
             if oldest_id > next_id:
-                elements = {
-                    id: element._to_dict() for id, element in self.client.elements.items()  # pylint: disable=protected-access
-                }
-                # return False
-            if not elements:
-                start = next_id - oldest_id
-                st = time.perf_counter()
-                for i in range(start, len(self._history)):
-                    # args = self._history[i][2]
-                    # args[1]['retransmit_id'] = retransmit_id
-                    # self.enqueue_message('retransmit', args, '')
-                    messages.append(self._history[i][2])
-                # messages = [msg for _, _, msg in itertools.islice(self._history, start, len(self._history))]
-                dur = time.perf_counter()-st
-                print(f'msg block: {(dur)*1000:.3f}', len(messages))
-                if messages:
-                    print(f't/msg: {(dur)*1000000/len(messages)}')
-                print(f'app avg: {(self._stats["appendTime"]/self._stats["count"]*1_000_000): .2f}')
-                print(f'mix: {self._stats["min"]*1_000_000:.2f}', f'max: {self._stats["max"]*1_000_000:.2f}')
-                # print(dmi)
+                return False
 
-            # self.enqueue_message('retransmit',
-            #                      {'starting_message_id': next_id, 'messages': messages, 'retransmit_id': retransmit_id},
-            #                      self.client.id)
+            start = next_id - oldest_id
+            st = time.perf_counter()
+            for i in range(start, len(self._history)):
+                messages.append(self._history[i][2])
+
+            dur = time.perf_counter()-st
+            print(f'msg block: {(dur)*1000:.3f}', len(messages))
+            if messages:
+                print(f't/msg: {(dur)*1000000/len(messages)}')
+            print(f'app avg: {(self._stats["appendTime"]/self._stats["count"]*1_000_000): .2f}')
+            print(f'mix: {self._stats["min"]*1_000_000:.2f}', f'max: {self._stats["max"]*1_000_000:.2f}')
 
         elif last_message_id != self._message_count:
             return False
 
-        if (elements):
-            olf = self.message_count
-
-        self._retransmit_count += 1
         self.enqueue_message('syncronize',
                              {
-                                 'starting_message_id': olf,
+                                 'starting_message_id': self._message_count,
                                  'messages': messages,
-                                 'elements': elements,
                                  'retransmit_id': retransmit_id
                              },
                              self.client.id)
@@ -175,20 +144,18 @@ class Outbox:
                 self._enqueue_event.clear()
 
                 coros = []
-                if self.updates and not self._skip_updates:
+                if self.updates:
                     data = {
                         element_id: None if element is None else element._to_dict()  # pylint: disable=protected-access
                         for element_id, element in self.updates.items()
                     }
                     coros.append(self._emit('update', data, self.client.id))
                     self.updates.clear()
-                self._skip_updates = False
 
                 if self.messages:
                     for target_id, message_type, data in self.messages:
                         coros.append(self._emit(message_type, data, target_id))
                     self.messages.clear()
-                    self._retransmit_count = 0
 
                 for coro in coros:
                     try:
