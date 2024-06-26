@@ -273,25 +273,12 @@ function createRandomUUID() {
   }
 }
 
-function processMessageId(event, message) {
+function processMessageId(message) {
   const msgId = message.message_id;
   delete message.message_id;
-  delete message.history;
 
-  if (document.title === "XX") {
-    return;
-  }
   if (msgId <= window.lastMessageId) {
-    console.log(`redundant: ${msgId}`, message);
-    //   le(message);
-    //   document.title = "XX";
-    return true;
-  }
-  if (msgId != window.lastMessageId + 1) {
-    console.log(`gap detected: ${msgId} -- ${window.lastMessageId}`, message);
-    le(message);
-    document.title = "XX";
-    return;
+    return false;
   }
   window.lastMessageId = msgId;
   return true;
@@ -314,11 +301,9 @@ function createApp(elements, options) {
       const url = window.location.protocol === "https:" ? "wss://" : "ws://" + window.location.host;
       window.path_prefix = options.prefix;
       window.lastMessageId = options.query.starting_message_id;
-      console.log(`options.query.starting_message_id: ${options.query.starting_message_id}`);
       window.syncing = true;
-      window.autoDisconnect = true;
-      window.initialConnection = true;
       window.syncingQue = [];
+      window.autoDisconnect = true;
 
       window.socket = io(url, {
         path: `${options.prefix}/_nicegui_ws/socket.io`,
@@ -343,30 +328,16 @@ function createApp(elements, options) {
           window.socket.emit("handshake", args, (res) => {
             if (!res.success && res.reason === "no_client_id") {
               console.log("reloading because handshake failed for clientId " + window.clientId);
-              document.title = "XX";
-              // window.location.reload();
+              window.location.reload();
             } else if (!res.success && res.reason === "sync_failure") {
-              console.log(`reloading because sync failed (increase message_history_max to avoid this)`);
-              document.title = "XX";
-              //     if (window.initialConnection) {
-              //     setTimeout(() => {
-              //       window.location.reload();
-              //     }, 11000);
-              //   } else {
-              //     window.location.reload();
-              //   }
+              console.log("reloading because sync failed (try increasing message_history_max)");
+              window.location.reload();
             }
-            window.initialConnection = false;
-
             document.getElementById("popup").ariaHidden = true;
 
             //===================================
             let mqf = Math.floor(Math.random() * 30 * 1000 + 1);
             setTimeout(() => {
-              if (document.title === "XX") {
-                return;
-              }
-
               if (window.autoDisconnect) {
                 window.txr = Math.floor(Math.random() * 10) * 1000;
                 console.log(`============== Planned disconnect: ${window.txr}`);
@@ -374,10 +345,6 @@ function createApp(elements, options) {
                   window.autoDisconnect = false;
                   window.socket.disconnect();
                   setTimeout(() => {
-                    if (document.title === "XX") {
-                      return;
-                    }
-
                     window.socket.connect();
                   }, 10000);
                 }
@@ -389,8 +356,7 @@ function createApp(elements, options) {
         connect_error: (err) => {
           if (err.message == "timeout") {
             console.log("reloading because connection timed out");
-            document.title = "XX";
-            // window.location.reload(); // see https://github.com/zauberzeug/nicegui/issues/198
+            window.location.reload(); // see https://github.com/zauberzeug/nicegui/issues/198
           }
         },
         try_reconnect: async () => {
@@ -426,67 +392,24 @@ function createApp(elements, options) {
         notify: (msg) => Quasar.Notify.create(msg),
         synchronize: (msg) => {
           window.autoDisconnect = true;
-          console.log(`window.syncing = false: ${0}`);
 
           if (msg.sync_id == window.syncId) {
             const timestamp = Date.now();
-            if (document.title === "XX") {
-              return;
-            }
-
             let msgs = msg.messages.concat(window.syncingQue);
-            console.log(`msgs: ${""}`, msgs);
-            let red = false;
-            let xvo = 0;
-            let startTime = null;
-            let startCount = null;
-
-            startCount = xvo;
-            startTime = performance.now();
-
-            var len = msgs.length;
+            let len = msgs.length;
+            let minChunk = len * 0.33;
             for (let i = 0; i < len; i++) {
-              if (document.title === "XX") {
+              if (!processMessageId(msgs[i][1])) {
                 return;
               }
-              xvo++;
-
-              //   if (msgs[i][1].message_id <= window.lastMessageId) {
-              //     return;
-              //   }
-
-              msgs[i][1].history = i;
-              if (!processMessageId(msgs[i][0], msgs[i][1])) {
-                return;
-              }
-
-              //   window.lastMessageId = msgId;
-              //   delete message.message_id;
               messageHandlers[msgs[i][0]](msgs[i][1]);
-              let dhn = Date.now() - timestamp;
-              if (dhn > 1000 && i < len * 0.33) {
-                console.log(`time: ${dhn}`);
-                console.log(`%: ${i / len}`);
+
+              if (Date.now() - timestamp > 1000 && i < minChunk) {
                 console.log("reloading because message backlog is too large");
-                // window.location.reload();
-                document.title = "XX";
+                window.location.reload();
                 return;
               }
             }
-            let now = performance.now();
-            let msg_count = xvo - startCount;
-            let t = now - startTime;
-
-            console.log(`msgs: ${msg_count}`);
-            console.log(`msgs/s: ${(msg_count / window.txr) * 1000}`);
-            console.log(`time: ${t}`);
-            console.log(`/s: ${t / msg_count}`);
-
-            console.log(`msg.messages.length: ${msg.messages.length}`);
-            console.log(`window.lastMessageId: ${window.lastMessageId}`);
-            console.log(`window.syncingQue.length: ${window.syncingQue.length}`);
-            console.log(`msgs.length: ${msgs.length}`);
-
             window.syncingQue = [];
             window.syncing = false;
           }
@@ -504,7 +427,7 @@ function createApp(elements, options) {
             if (!window.syncing) {
               //   window.lastMessageId = data.message_id;
               //   delete message.message_id;
-              if (!processMessageId(event, data)) {
+              if (!processMessageId(data)) {
                 return;
               }
             } else {
@@ -532,11 +455,4 @@ function createApp(elements, options) {
   }).use(Quasar, {
     config: options.quasarConfig,
   }));
-}
-function le(msg) {
-  console.log(`@@@@@@@@@@@@@@@@@@@@: ${0}`);
-  if ("history" in msg) {
-    console.log(`history: ${msg.history}`);
-  }
-  // console.log(`index: ${msg.iindex}`);
 }
