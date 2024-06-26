@@ -63,6 +63,9 @@ class Client:
         self._has_warned_about_deleted_client = False
         self.tab_id: Optional[str] = None
 
+        self.connect_handlers: List[Union[Callable[..., Any], Awaitable]] = []
+        self.disconnect_handlers: List[Union[Callable[..., Any], Awaitable]] = []
+
         self.page = page
         self.outbox = Outbox(self)
 
@@ -77,9 +80,6 @@ class Client:
         self._body_html = ''
 
         self.storage = ObservableDict()
-
-        self.connect_handlers: List[Union[Callable[..., Any], Awaitable]] = []
-        self.disconnect_handlers: List[Union[Callable[..., Any], Awaitable]] = []
 
         self._temporary_socket_id: Optional[str] = None
 

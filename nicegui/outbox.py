@@ -31,8 +31,10 @@ class Outbox:
         self._message_count: int = 0
         self._retransmit_count: int = 0
         self._stats = {"appendTime": 0, "count": 0, "min": 9999999999999999, "max": 0}
-        self._history_duration: Optional[float] = None
-        self._history_max_length: int = 0
+        self._history_duration: float = 0.0
+        self._history_max: int = 0
+        self.history_enabled: Optional[bool] = None
+        self.client.on_connect(self._configue_history)
 
         if core.app.is_started:
             background_tasks.create(self.loop(), name=f'outbox loop {client.id}')
@@ -67,28 +69,34 @@ class Outbox:
         self.messages.append((target_id, message_type, data))
         self._set_enqueue_event()
 
-    def _append_history(self, message_type: MessageType, data: Any, target: ClientId) -> None:
-        if self._history_duration is None:
+    def _configue_history(self):
+        if self.history_enabled is None:
+            self._history_max = core.app.config.message_history_max
+            if self._history_max == 0:
+                self.history_enabled = False
+                return
+
+            self.history_enabled = True
             if self.client.shared:
                 self._history_duration = 30
             else:
-                dt = core.sio.eio.ping_interval + core.sio.eio.ping_timeout + self.client.page.resolve_reconnect_timeout()
-                print(f'dt: {dt}')
-                self._history_duration = dt
-            self._history_max_length = core.app.config.message_history_max
-            print(f'_history_duration: {self._history_duration}')
-            print(f'_history_max_len {self._history_max_length}')
+                connection_timeout = core.sio.eio.ping_interval + core.sio.eio.ping_timeout
+                self._history_duration = connection_timeout + self.client.page.resolve_reconnect_timeout()
 
+            print(f'_history_duration: {self._history_duration}')
+            print(f'_history_max_len {self._history_max}')
+
+    def _append_history(self, message_type: MessageType, data: Any, target: ClientId) -> None:
         self._message_count += 1
         timestamp = time.time()
         while self._history and (self._history[0][1] < timestamp - self._history_duration or
-                                 len(self._history) > self._history_max_length):
+                                 len(self._history) > self._history_max):
             self._history.popleft()
         self._history.append((self._message_count, timestamp, (message_type, data, target)))
         if len(self._history) % 1000 == 0:
             print(f'len(self._history): {len(self._history)}', asizeof.asizeof(self._history))
 
-    def synchronize(self, last_message_id: int, retransmit_id: str) -> bool:
+    def synchronize(self, last_message_id: int, sync_id: str) -> bool:
         """Synchronize the state of a connecting client by resending missed messages, if possible."""
         print(len(self._history), len(self.messages), len(self.updates))
         print(f'lmi: {last_message_id}')
@@ -114,14 +122,13 @@ class Outbox:
 
         elif last_message_id != self._message_count:
             return False
+        print(f'self.enqueue_message: {0}')
+        self.enqueue_message('synchronize', {
+            'starting_message_id': self._message_count,
+            'messages': messages,
+            'sync_id': sync_id
+        }, self.client.id)
 
-        self.enqueue_message('syncronize',
-                             {
-                                 'starting_message_id': self._message_count,
-                                 'messages': messages,
-                                 'retransmit_id': retransmit_id
-                             },
-                             self.client.id)
         return True
 
     async def loop(self) -> None:
@@ -168,10 +175,12 @@ class Outbox:
                 await asyncio.sleep(0.1)
 
     async def _emit(self, message_type: MessageType, data: Any, target_id: ClientId) -> None:
-        if message_type != 'syncronize':
+        if message_type != 'synchronize':  # TODO
             st = time.perf_counter()
-            if self._history_duration != 0:
+            if self.history_enabled:
                 self._append_history(message_type, data, target_id)
+                data['message_id'] = self._message_count
+
                 t = time.perf_counter()-st
                 self._stats["appendTime"] += t
                 self._stats["count"] += 1
@@ -180,7 +189,6 @@ class Outbox:
                 if (t > self._stats["max"]):
                     self._stats["max"] = t
 
-            data['message_id'] = self._message_count
         else:
             # message_type, data, target_id = data
             print('ssssssssssssssss')
