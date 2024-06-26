@@ -274,13 +274,11 @@ function createRandomUUID() {
 }
 
 function processMessageId(message) {
-  const msgId = message.message_id;
-  delete message.message_id;
-
-  if (msgId <= window.lastMessageId) {
+  if (message.message_id <= window.lastMessageId) {
     return false;
   }
-  window.lastMessageId = msgId;
+  window.lastMessageId = message.message_id;
+  delete message.message_id;
   return true;
 }
 
@@ -330,26 +328,26 @@ function createApp(elements, options) {
               console.log("reloading because handshake failed for clientId " + window.clientId);
               window.location.reload();
             } else if (!res.success && res.reason === "sync_failure") {
-              console.log("reloading because sync failed (try increasing message_history_max)");
+              console.log("reloading because sync failed (see message_history_max)");
               window.location.reload();
             }
             document.getElementById("popup").ariaHidden = true;
 
             //===================================
-            let mqf = Math.floor(Math.random() * 30 * 1000 + 1);
-            setTimeout(() => {
-              if (window.autoDisconnect) {
-                window.txr = Math.floor(Math.random() * 10) * 1000;
-                console.log(`============== Planned disconnect: ${window.txr}`);
-                if (window.autoDisconnect) {
-                  window.autoDisconnect = false;
-                  window.socket.disconnect();
-                  setTimeout(() => {
-                    window.socket.connect();
-                  }, 10000);
-                }
-              }
-            }, mqf);
+            // let mqf = Math.floor(Math.random() * 8 * 1000 + 1);
+            // setTimeout(() => {
+            //   if (window.autoDisconnect) {
+            //     window.txr = Math.floor(Math.random() * 10) * 1000;
+            //     console.log(`============== Planned disconnect: ${window.txr}`);
+            //     if (window.autoDisconnect) {
+            //       window.autoDisconnect = false;
+            //       window.socket.disconnect();
+            //       setTimeout(() => {
+            //         window.socket.connect();
+            //       }, mqf);
+            //     }
+            //   }
+            // }, mqf);
             // ===============================
           });
         },

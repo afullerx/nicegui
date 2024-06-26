@@ -5,8 +5,6 @@ import time
 from collections import deque
 from typing import TYPE_CHECKING, Any, Deque, Dict, Optional, Tuple
 
-from pympler import asizeof
-
 from . import background_tasks, core
 
 if TYPE_CHECKING:
@@ -29,8 +27,6 @@ class Outbox:
         self._enqueue_event: Optional[asyncio.Event] = None
         self._history: Deque[Tuple[int, float, Tuple[MessageType, Any, ClientId]]] = deque()
         self._message_count: int = 0
-        self._retransmit_count: int = 0
-        self._stats = {"appendTime": 0, "count": 0, "min": 9999999999999999, "max": 0}
         self._history_duration: float = 0.0
         self._history_max: int = 0
         self.history_enabled: Optional[bool] = None
@@ -83,9 +79,6 @@ class Outbox:
                 connection_timeout = core.sio.eio.ping_interval + core.sio.eio.ping_timeout
                 self._history_duration = connection_timeout + self.client.page.resolve_reconnect_timeout()
 
-            print(f'_history_duration: {self._history_duration}')
-            print(f'_history_max_len {self._history_max}')
-
     def _append_history(self, message_type: MessageType, data: Any, target: ClientId) -> None:
         self._message_count += 1
         timestamp = time.time()
@@ -93,14 +86,9 @@ class Outbox:
                                  len(self._history) > self._history_max):
             self._history.popleft()
         self._history.append((self._message_count, timestamp, (message_type, data, target)))
-        if len(self._history) % 1000 == 0:
-            print(f'len(self._history): {len(self._history)}', asizeof.asizeof(self._history))
 
     def synchronize(self, last_message_id: int, sync_id: str) -> bool:
         """Synchronize the state of a connecting client by resending missed messages, if possible."""
-        print(len(self._history), len(self.messages), len(self.updates))
-        print(f'lmi: {last_message_id}')
-
         messages = []
         if self._history:
             next_id = last_message_id + 1
@@ -109,22 +97,13 @@ class Outbox:
                 return False
 
             start = next_id - oldest_id
-            st = time.perf_counter()
             for i in range(start, len(self._history)):
                 messages.append(self._history[i][2])
 
-            dur = time.perf_counter()-st
-            print(f'msg block: {(dur)*1000:.3f}', len(messages))
-            if messages:
-                print(f't/msg: {(dur)*1000000/len(messages)}')
-            print(f'app avg: {(self._stats["appendTime"]/self._stats["count"]*1_000_000): .2f}')
-            print(f'mix: {self._stats["min"]*1_000_000:.2f}', f'max: {self._stats["max"]*1_000_000:.2f}')
-
         elif last_message_id != self._message_count:
             return False
-        print(f'self.enqueue_message: {0}')
+
         self.enqueue_message('synchronize', {
-            'starting_message_id': self._message_count,
             'messages': messages,
             'sync_id': sync_id
         }, self.client.id)
@@ -175,29 +154,10 @@ class Outbox:
                 await asyncio.sleep(0.1)
 
     async def _emit(self, message_type: MessageType, data: Any, target_id: ClientId) -> None:
-        if message_type != 'synchronize':  # TODO
-            st = time.perf_counter()
-            if self.history_enabled:
-                self._append_history(message_type, data, target_id)
-                data['message_id'] = self._message_count
+        if self.history_enabled and message_type != 'synchronize':
+            self._append_history(message_type, data, target_id)
+            data['message_id'] = self._message_count
 
-                t = time.perf_counter()-st
-                self._stats["appendTime"] += t
-                self._stats["count"] += 1
-                if (t < self._stats["min"]):
-                    self._stats["min"] = t
-                if (t > self._stats["max"]):
-                    self._stats["max"] = t
-
-        else:
-            # message_type, data, target_id = data
-            print('ssssssssssssssss')
-            pass
-        # print(asizeof.asizeof(self._history))
-        # print(f'=============================== {message_type} ==========================================')
-        # print(data)
-        # if 'message_id' not in data:
-        #     print(f'out: {data}')
         await core.sio.emit(message_type, data, room=target_id)
         if core.air is not None and core.air.is_air_target(target_id):
             await core.air.emit(message_type, data, room=target_id)
