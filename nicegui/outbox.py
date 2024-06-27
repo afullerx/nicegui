@@ -68,7 +68,8 @@ class Outbox:
         self._history_max = core.app.config.message_history_max
         if self._history_max == 0:
             self.history_enabled = False
-            return
+        else:
+            self.history_enabled = True
 
         if self.client.shared:
             self._history_duration = 30
@@ -158,7 +159,7 @@ class Outbox:
         if self.history_enabled is None:
             self._configue_history()
 
-        if self._history_max and message_type != 'synchronize':
+        if self.history_enabled and message_type != 'synchronize':
             self._append_history(message_type, data, target_id)
             data['message_id'] = self._message_count
 
