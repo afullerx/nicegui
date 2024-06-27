@@ -273,15 +273,6 @@ function createRandomUUID() {
   }
 }
 
-function processMessageId(message) {
-  if (message.message_id <= window.lastMessageId) {
-    return false;
-  }
-  window.lastMessageId = message.message_id;
-  delete message.message_id;
-  return true;
-}
-
 function createApp(elements, options) {
   replaceUndefinedAttributes(elements, 0);
   return (app = Vue.createApp({
@@ -301,8 +292,6 @@ function createApp(elements, options) {
       window.lastMessageId = options.query.starting_message_id;
       window.syncing = true;
       window.syncingQue = [];
-      window.autoDisconnect = true;
-
       window.socket = io(url, {
         path: `${options.prefix}/_nicegui_ws/socket.io`,
         query: options.query,
@@ -332,23 +321,6 @@ function createApp(elements, options) {
               window.location.reload();
             }
             document.getElementById("popup").ariaHidden = true;
-
-            //===================================
-            // let mqf = Math.floor(Math.random() * 8 * 1000 + 1);
-            // setTimeout(() => {
-            //   if (window.autoDisconnect) {
-            //     window.txr = Math.floor(Math.random() * 10) * 1000;
-            //     console.log(`============== Planned disconnect: ${window.txr}`);
-            //     if (window.autoDisconnect) {
-            //       window.autoDisconnect = false;
-            //       window.socket.disconnect();
-            //       setTimeout(() => {
-            //         window.socket.connect();
-            //       }, mqf);
-            //     }
-            //   }
-            // }, mqf);
-            // ===============================
           });
         },
         connect_error: (err) => {
@@ -389,23 +361,15 @@ function createApp(elements, options) {
         download: (msg) => download(msg.src, msg.filename, msg.media_type, options.prefix),
         notify: (msg) => Quasar.Notify.create(msg),
         synchronize: (msg) => {
-          window.autoDisconnect = true;
-
           if (msg.sync_id == window.syncId) {
-            const timestamp = Date.now();
             let msgs = msg.messages.concat(window.syncingQue);
             let len = msgs.length;
-            let minChunk = len * 0.33;
             for (let i = 0; i < len; i++) {
-              if (!processMessageId(msgs[i][1])) {
-                return;
-              }
-              messageHandlers[msgs[i][0]](msgs[i][1]);
-
-              if (Date.now() - timestamp > 1000 && i < minChunk) {
-                console.log("reloading because message backlog is too large");
-                window.location.reload();
-                return;
+              let msg = msgs[i][1];
+              if (msg.message_id > window.lastMessageId) {
+                window.lastMessageId = msg.message_id;
+                delete msg.message_id;
+                messageHandlers[msgs[i][0]](msg);
               }
             }
             window.syncingQue = [];
@@ -418,16 +382,13 @@ function createApp(elements, options) {
       for (const [event, handler] of Object.entries(messageHandlers)) {
         window.socket.on(event, async (...args) => {
           const data = args[0];
-          if (args.length > 0 && data.hasOwnProperty("message_id")) {
-            // if (data.message_id <= window.lastMessageId) {
-            //   return;
-            // }
+          if (data > 0 && data.hasOwnProperty("message_id")) {
             if (!window.syncing) {
-              //   window.lastMessageId = data.message_id;
-              //   delete message.message_id;
-              if (!processMessageId(data)) {
+              if (data.message_id <= window.lastMessageId) {
                 return;
               }
+              window.lastMessageId = data.message_id;
+              delete data.message_id;
             } else {
               window.syncingQue.push([event, data]);
               return;
@@ -453,4 +414,4 @@ function createApp(elements, options) {
   }).use(Quasar, {
     config: options.quasarConfig,
   }));
-} //test
+}
