@@ -47,7 +47,7 @@ def run(*,
         endpoint_documentation: Literal['none', 'internal', 'page', 'all'] = 'none',
         storage_secret: Optional[str] = None,
         show_welcome_message: bool = True,
-        message_history_max: int = 100,
+        message_history_max: int = 300,
         **kwargs: Any,
         ) -> None:
     """ui.run

@@ -158,7 +158,6 @@ class Outbox:
     async def _emit(self, message_type: MessageType, data: Any, target_id: ClientId) -> None:
         if self.history_enabled is None:
             self._configue_history()
-
         if self.history_enabled and message_type != 'synchronize':
             self._append_history(message_type, data, target_id)
             data['message_id'] = self._message_count

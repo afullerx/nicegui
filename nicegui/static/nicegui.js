@@ -388,7 +388,7 @@ function createApp(elements, options) {
                 return;
               }
               window.lastMessageId = data.message_id;
-              delete args[0].message_id;
+              delete data.message_id;
             } else {
               window.syncingQue.push([event, data]);
               return;
