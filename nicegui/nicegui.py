@@ -171,7 +171,7 @@ async def _on_handshake(sid: str, data: Dict[str, Any]) -> Dict[str, Any]:
     client.tab_id = data['tab_id']
     await sio.enter_room(sid, client.id)
     client.handle_handshake()
-    if client.outbox.history_enabled and not client.outbox.synchronize(data['last_message_id'], data['sync_id']):
+    if not client.outbox.synchronize(data['last_message_id'], data['sync_id']):
         return {'success': False, 'reason': 'sync_failure'}
     return {'success': True}
 

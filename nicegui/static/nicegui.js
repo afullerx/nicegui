@@ -382,19 +382,18 @@ function createApp(elements, options) {
       for (const [event, handler] of Object.entries(messageHandlers)) {
         window.socket.on(event, async (...args) => {
           const data = args[0];
-          if (data > 0 && data.hasOwnProperty("message_id")) {
+          if (data && data.hasOwnProperty("message_id")) {
             if (!window.syncing) {
               if (data.message_id <= window.lastMessageId) {
                 return;
               }
               window.lastMessageId = data.message_id;
-              delete data.message_id;
+              delete args[0].message_id;
             } else {
               window.syncingQue.push([event, data]);
               return;
             }
           }
-
           socketMessageQueue.push(() => handler(...args));
           if (!isProcessingSocketMessage) {
             while (socketMessageQueue.length > 0) {
