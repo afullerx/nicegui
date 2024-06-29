@@ -360,7 +360,7 @@ function createApp(elements, options) {
         },
         download: (msg) => download(msg.src, msg.filename, msg.media_type, options.prefix),
         notify: (msg) => Quasar.Notify.create(msg),
-        synchronize: (msg) => {
+        sync: (msg) => {
           if (msg.sync_id == window.syncId) {
             let msgs = msg.messages.concat(window.syncingQue);
             let len = msgs.length;
