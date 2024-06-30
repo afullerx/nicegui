@@ -27,7 +27,6 @@ class Outbox:
         self._enqueue_event: Optional[asyncio.Event] = None
         self._history: Deque[Tuple[int, float, Tuple[MessageType, Any, ClientId]]] = deque()
         self._message_count: int = 0
-        self._history_duration: float = 0.0
         self._history_max: int = 0
 
         if self.client.shared:
@@ -77,7 +76,7 @@ class Outbox:
             self._history.popleft()
         self._history.append((self._message_count, timestamp, (message_type, data, target)))
 
-    def synchronize(self, last_message_id: int, sync_id: str) -> bool:
+    async def synchronize(self, last_message_id: int, sync_id: str) -> bool:
         """Synchronize the state of a connecting client by resending missed messages, if possible."""
         messages = []
         if self._history_max:
@@ -94,7 +93,7 @@ class Outbox:
             elif last_message_id != self._message_count:
                 return False
 
-        self.enqueue_message('sync', {'sync_id': sync_id, 'messages': messages}, self.client.id)
+        await self._emit('sync', {'sync_id': sync_id, 'messages': messages}, self.client.id)
 
         return True
 

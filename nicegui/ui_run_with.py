@@ -43,7 +43,7 @@ def run_with(
     :param prod_js: whether to use the production version of Vue and Quasar dependencies (default: `True`)
     :param storage_secret: secret key for browser-based storage (default: `None`, a value is required to enable ui.storage.individual and ui.storage.browser)
     :param show_welcome_message: whether to show the welcome message (default: `True`)
-    :param message_history_max: Max number of messages that will be stored and resent after a connection inturruption (default: 300)
+    :param message_history_max: maximum number of messages that will be stored and resent after a connection interruption (default: 300)
     """
     core.app.config.add_run_config(
         reload=False,
