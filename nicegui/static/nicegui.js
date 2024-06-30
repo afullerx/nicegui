@@ -362,8 +362,8 @@ function createApp(elements, options) {
         notify: (msg) => Quasar.Notify.create(msg),
         sync: (msg) => {
           if (msg.sync_id == window.syncId) {
-            let msgs = msg.messages.concat(window.syncingQue);
-            let len = msgs.length;
+            const msgs = msg.messages.concat(window.syncingQue);
+            const len = msgs.length;
             for (let i = 0; i < len; i++) {
               let msg = msgs[i][1];
               if (msg.message_id > window.lastMessageId) {
