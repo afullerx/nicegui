@@ -305,12 +305,11 @@ function createApp(elements, options) {
             tabId = createRandomUUID();
             sessionStorage.setItem("__nicegui_tab_id", tabId);
           }
-          window.syncId = createRandomUUID();
           const args = {
             client_id: window.clientId,
             tab_id: tabId,
             last_message_id: window.lastMessageId,
-            sync_id: window.syncId,
+            sync_id: window.socket.id,
           };
           window.socket.emit("handshake", args, (res) => {
             if (!res.success && res.reason === "no_client_id") {
@@ -361,19 +360,17 @@ function createApp(elements, options) {
         download: (msg) => download(msg.src, msg.filename, msg.media_type, options.prefix),
         notify: (msg) => Quasar.Notify.create(msg),
         sync: (msg) => {
-          if (msg.sync_id == window.syncId) {
-            const msgs = msg.messages.concat(window.syncingQue);
-            const len = msgs.length;
+          if (msg.sync_id == window.socket.id) {
+            window.syncing = false;
+            const len = msg.history.length;
             for (let i = 0; i < len; i++) {
-              let msg = msgs[i][1];
-              if (msg.message_id > window.lastMessageId) {
-                window.lastMessageId = msg.message_id;
-                delete msg.message_id;
-                messageHandlers[msgs[i][0]](msg);
+              let message = msg.history[i][1];
+              if (message.message_id > window.lastMessageId) {
+                window.lastMessageId = message.message_id;
+                delete message.message_id;
+                messageHandlers[msg.history[i][0]](message);
               }
             }
-            window.syncingQue = [];
-            window.syncing = false;
           }
         },
       };
@@ -390,7 +387,6 @@ function createApp(elements, options) {
               window.lastMessageId = data.message_id;
               delete data.message_id;
             } else {
-              window.syncingQue.push([event, data]);
               return;
             }
           }

@@ -93,7 +93,7 @@ class Outbox:
             elif last_message_id != self._message_count:
                 return False
 
-        await self._emit('sync', {'sync_id': sync_id, 'messages': messages}, self.client.id)
+        await self._emit('sync', {'sync_id': sync_id, 'history': messages}, self.client.id)
 
         return True
 
