@@ -291,7 +291,6 @@ function createApp(elements, options) {
       window.path_prefix = options.prefix;
       window.lastMessageId = options.query.starting_message_id;
       window.syncing = true;
-      window.syncingQue = [];
       window.socket = io(url, {
         path: `${options.prefix}/_nicegui_ws/socket.io`,
         query: options.query,
@@ -363,12 +362,13 @@ function createApp(elements, options) {
           if (msg.sync_id == window.socket.id) {
             window.syncing = false;
             const len = msg.history.length;
+            const history = msg.history;
             for (let i = 0; i < len; i++) {
-              let message = msg.history[i][1];
+              let message = history[i][1];
               if (message.message_id > window.lastMessageId) {
                 window.lastMessageId = message.message_id;
                 delete message.message_id;
-                messageHandlers[msg.history[i][0]](message);
+                messageHandlers[history[i][0]](message);
               }
             }
           }
