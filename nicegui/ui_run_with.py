@@ -25,7 +25,7 @@ def run_with(
     prod_js: bool = True,
     storage_secret: Optional[str] = None,
     show_welcome_message: bool = True,
-    message_history_max: int = 300,
+    message_history_max: int = 1000,
 ) -> None:
     """Run NiceGUI with FastAPI.
 
@@ -43,7 +43,7 @@ def run_with(
     :param prod_js: whether to use the production version of Vue and Quasar dependencies (default: `True`)
     :param storage_secret: secret key for browser-based storage (default: `None`, a value is required to enable ui.storage.individual and ui.storage.browser)
     :param show_welcome_message: whether to show the welcome message (default: `True`)
-    :param message_history_max: maximum number of messages that will be stored and resent after a connection interruption (default: 300)
+    :param message_history_max: maximum number of messages that will be stored and resent after a connection interruption (default: 1000)
     """
     core.app.config.add_run_config(
         reload=False,

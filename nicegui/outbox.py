@@ -25,9 +25,8 @@ class Outbox:
         self.messages: Deque[Message] = deque()
         self._should_stop = False
         self._enqueue_event: Optional[asyncio.Event] = None
-        self._history: Deque[Tuple[int, float, Tuple[MessageType, Any, ClientId]]] = deque()
+        self._history: Optional[Deque[Tuple[int, float, Tuple[MessageType, Any, ClientId]]]] = None
         self._message_count: int = 0
-        self._history_max: int = 0
 
         if self.client.shared:
             self._history_duration = 30
@@ -71,15 +70,14 @@ class Outbox:
     def _append_history(self, message_type: MessageType, data: Any, target: ClientId) -> None:
         self._message_count += 1
         timestamp = time.time()
-        while self._history and (self._history[0][1] < timestamp - self._history_duration or
-                                 len(self._history) > self._history_max):
+        self._history.append((self._message_count, timestamp, (message_type, data, target)))  # type: ignore[union-attr]
+        while self._history and (self._history[0][1] < timestamp - self._history_duration):
             self._history.popleft()
-        self._history.append((self._message_count, timestamp, (message_type, data, target)))
 
     async def synchronize(self, last_message_id: int, sync_id: str) -> bool:
         """Synchronize the state of a connecting client by resending missed messages, if possible."""
         messages = []
-        if self._history_max:
+        if self._history is not None:
             if self._history:
                 next_id = last_message_id + 1
                 oldest_id = self._history[0][0]
@@ -94,12 +92,13 @@ class Outbox:
                 return False
 
         await self._emit('sync', {'sync_id': sync_id, 'history': messages}, self.client.id)
-
         return True
 
     async def loop(self) -> None:
         """Send updates and messages to all clients in an endless loop."""
-        self._history_max = core.app.config.message_history_max
+        if core.app.config.message_history_max:
+            self._history = Deque(maxlen=core.app.config.message_history_max)
+
         self._enqueue_event = asyncio.Event()
         self._enqueue_event.set()
 
@@ -142,7 +141,7 @@ class Outbox:
                 await asyncio.sleep(0.1)
 
     async def _emit(self, message_type: MessageType, data: Any, target_id: ClientId) -> None:
-        if self._history_max and message_type != 'sync':
+        if self._history is not None and message_type != 'sync':
             self._append_history(message_type, data, target_id)
             data['message_id'] = self._message_count
 
