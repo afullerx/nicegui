@@ -378,16 +378,13 @@ function createApp(elements, options) {
         window.socket.on(event, async (...args) => {
           const data = args[0];
           if (data && data.hasOwnProperty("message_id")) {
-            if (!window.syncing) {
-              if (data.message_id <= window.lastMessageId) {
-                return;
-              }
-              window.lastMessageId = data.message_id;
-              delete data.message_id;
-            } else {
+            if (window.syncing || data.message_id <= window.lastMessageId) {
               return;
             }
+            window.lastMessageId = data.message_id;
+            delete data.message_id;
           }
+
           socketMessageQueue.push(() => handler(...args));
           if (!isProcessingSocketMessage) {
             while (socketMessageQueue.length > 0) {
