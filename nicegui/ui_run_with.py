@@ -19,13 +19,13 @@ def run_with(
     language: Language = 'en-US',
     binding_refresh_interval: float = 0.1,
     reconnect_timeout: float = 3.0,
+    message_buffer_max: int = 1000,
     mount_path: str = '/',
     on_air: Optional[Union[str, Literal[True]]] = None,
     tailwind: bool = True,
     prod_js: bool = True,
     storage_secret: Optional[str] = None,
     show_welcome_message: bool = True,
-    message_history_max: int = 1000,
 ) -> None:
     """Run NiceGUI with FastAPI.
 
@@ -37,13 +37,13 @@ def run_with(
     :param language: language for Quasar elements (default: `'en-US'`)
     :param binding_refresh_interval: time between binding updates (default: `0.1` seconds, bigger is more CPU friendly)
     :param reconnect_timeout: maximum time the server waits for the browser to reconnect (default: 3.0 seconds)
+    :param message_buffer_max: maximum number of messages that will be stored and resent after a connection interruption (default: 1000)
     :param mount_path: mount NiceGUI at this path (default: `'/'`)
     :param on_air: tech preview: `allows temporary remote access <https://nicegui.io/documentation/section_configuration_deployment#nicegui_on_air>`_ if set to `True` (default: disabled)
     :param tailwind: whether to use Tailwind CSS (experimental, default: `True`)
     :param prod_js: whether to use the production version of Vue and Quasar dependencies (default: `True`)
     :param storage_secret: secret key for browser-based storage (default: `None`, a value is required to enable ui.storage.individual and ui.storage.browser)
     :param show_welcome_message: whether to show the welcome message (default: `True`)
-    :param message_history_max: maximum number of messages that will be stored and resent after a connection interruption (default: 1000)
     """
     core.app.config.add_run_config(
         reload=False,
@@ -54,10 +54,10 @@ def run_with(
         language=language,
         binding_refresh_interval=binding_refresh_interval,
         reconnect_timeout=reconnect_timeout,
+        message_buffer_max=message_buffer_max,
         tailwind=tailwind,
         prod_js=prod_js,
         show_welcome_message=show_welcome_message,
-        message_history_max=message_history_max,
     )
 
     storage.set_storage_secret(storage_secret)
