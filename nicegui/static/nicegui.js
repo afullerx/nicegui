@@ -359,7 +359,7 @@ function createApp(elements, options) {
         download: (msg) => download(msg.src, msg.filename, msg.media_type, options.prefix),
         notify: (msg) => Quasar.Notify.create(msg),
         sync: (msg) => {
-          if (msg.sync_id == window.socket.id) {
+          if (msg.sync_id === window.socket.id) {
             window.syncing = false;
             for (let i = 0; i < msg.history.length; i++) {
               let message = msg.history[i][1];

@@ -71,7 +71,7 @@ class Outbox:
         self._message_count += 1
         timestamp = time.time()
         self._history.append((self._message_count, timestamp, (message_type, data, target)))  # type: ignore[union-attr]
-        while self._history and (self._history[0][1] < timestamp - self._history_duration):
+        while self._history and self._history[0][1] < timestamp - self._history_duration:
             self._history.popleft()
 
     async def synchronize(self, last_message_id: int, sync_id: str) -> bool:
