@@ -173,6 +173,9 @@ async def _on_handshake(sid: str, data: Dict[str, Any]) -> Dict[str, Any]:
     if not await client.outbox.synchronize(data['last_message_id'], data['socket_ids']):
         return {'success': False, 'reason': 'sync_failure'}
     client.handle_handshake()
+    if (data['initial_connection']):
+        print(f'client.send_state: {0}')
+        client.send_state(sid)
     return {'success': True}
 
 

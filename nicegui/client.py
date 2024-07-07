@@ -81,6 +81,7 @@ class Client:
 
         self.connect_handlers: List[Union[Callable[..., Any], Awaitable]] = []
         self.disconnect_handlers: List[Union[Callable[..., Any], Awaitable]] = []
+        self.state_send_handlers: List[Union[Callable[..., Any], Awaitable]] = []
 
         self._temporary_socket_id: Optional[str] = None
 
@@ -243,6 +244,16 @@ class Client:
     def on_disconnect(self, handler: Union[Callable[..., Any], Awaitable]) -> None:
         """Add a callback to be invoked when the client disconnects."""
         self.disconnect_handlers.append(handler)
+
+    def on_send_state(self, handler: Union[Callable[..., Any], Awaitable]) -> None:
+        """Add a callback to be invoked when the"""
+        self.state_send_handlers.append(handler)
+
+    def send_state(self, sid):
+        print(f'send_state: {0}')
+        for t in self.state_send_handlers:
+            print(f't: {0}')
+            t(sid)
 
     def handle_handshake(self) -> None:
         """Cancel pending disconnect task and invoke connect handlers."""

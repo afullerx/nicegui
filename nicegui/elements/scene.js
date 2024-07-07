@@ -201,12 +201,12 @@ export default {
     this.texture_loader = new THREE.TextureLoader();
     this.stl_loader = new STLLoader();
     this.gltf_loader = new GLTFLoader();
-
-    const connectInterval = setInterval(() => {
-      if (window.socket.id === undefined) return;
-      this.$emit("init", { socket_id: window.socket.id });
-      clearInterval(connectInterval);
-    }, 100);
+    this.initialized = false;
+    // const connectInterval = setInterval(() => {
+    //   if (window.socket.id === undefined) return;
+    //   this.$emit("init", { socket_id: window.socket.id });
+    //   clearInterval(connectInterval);
+    // }, 100);
   },
 
   beforeDestroy() {
@@ -215,6 +215,9 @@ export default {
 
   methods: {
     create(type, id, parent_id, ...args) {
+      if (!this.initialized) {
+        return;
+      }
       let mesh;
       if (type == "group") {
         mesh = new THREE.Group();
@@ -438,6 +441,7 @@ export default {
       this.camera.updateProjectionMatrix();
     },
     init_objects(data) {
+      this.initialized = true;
       for (const [
         type,
         id,

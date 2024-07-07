@@ -292,6 +292,7 @@ function createApp(elements, options) {
       window.lastMessageId = options.query.starting_message_id;
       window.syncing = true;
       window.socketIds = [];
+      window.initialConnection = true;
       window.socket = io(url, {
         path: `${options.prefix}/_nicegui_ws/socket.io`,
         query: options.query,
@@ -311,6 +312,7 @@ function createApp(elements, options) {
             tab_id: tabId,
             last_message_id: window.lastMessageId,
             socket_ids: window.socketIds,
+            initial_connection: window.initialConnection,
           };
           window.socket.emit("handshake", args, (res) => {
             if (!res.success && res.reason === "no_client_id") {
@@ -321,6 +323,7 @@ function createApp(elements, options) {
               window.location.reload();
             }
             document.getElementById("popup").ariaHidden = true;
+            window.initialConnection = false;
           });
         },
         connect_error: (err) => {
