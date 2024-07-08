@@ -185,7 +185,7 @@ class Scene(Element,
         # self.clear()
         self.is_initialized = True
         with self.client.individual_target(socket_id):
-            self.move_camera(duration=0)
+            # self.move_camera(duration=0)
             self.run_method('init_objects', [obj.data for obj in self.objects.values()])
 
     def run_method(self, name: str, *args: Any, timeout: float = 1, check_interval: float = 0.01) -> AwaitableResponse:
