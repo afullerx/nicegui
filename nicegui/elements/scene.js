@@ -201,7 +201,7 @@ export default {
     this.texture_loader = new THREE.TextureLoader();
     this.stl_loader = new STLLoader();
     this.gltf_loader = new GLTFLoader();
-    this.initialized = false;
+    this.initialized = true;
     // const connectInterval = setInterval(() => {
     //   if (window.socket.id === undefined) return;
     //   this.$emit("init", { socket_id: window.socket.id });
@@ -441,6 +441,9 @@ export default {
       this.camera.updateProjectionMatrix();
     },
     init_objects(data) {
+      if (this.initialized) {
+      }
+
       this.initialized = true;
       for (const [
         type,

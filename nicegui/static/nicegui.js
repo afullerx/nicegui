@@ -290,7 +290,7 @@ function createApp(elements, options) {
       const url = window.location.protocol === "https:" ? "wss://" : "ws://" + window.location.host;
       window.path_prefix = options.prefix;
       window.lastMessageId = options.query.starting_message_id;
-      window.syncing = true;
+      window.syncing = false;
       window.socketIds = [];
       window.initialConnection = true;
       window.socket = io(url, {
@@ -340,7 +340,7 @@ function createApp(elements, options) {
         },
         disconnect: () => {
           document.getElementById("popup").ariaHidden = false;
-          window.syncing = true;
+          //   window.syncing = true;
         },
         update: async (msg) => {
           for (const [id, element] of Object.entries(msg)) {
@@ -375,6 +375,10 @@ function createApp(elements, options) {
               }
             }
           }
+        },
+        fullsync: (msg) => {
+          replaceUndefinedAttributes(msg, 0);
+          this.elements = msg;
         },
       };
       const socketMessageQueue = [];

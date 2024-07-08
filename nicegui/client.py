@@ -249,7 +249,13 @@ class Client:
         """Add a callback to be invoked when the"""
         self.state_send_handlers.append(handler)
 
-    def send_state(self, sid):
+    def send_state(self, sid, incl_elements=False):
+        if (incl_elements):
+            elements = {
+                id: element._to_dict() for id, element in self.elements.items()  # pylint: disable=protected-access
+            }
+            self.outbox.enqueue_message('fullsync', elements, sid)
+
         print(f'send_state: {0}')
         for t in self.state_send_handlers:
             print(f't: {0}')
