@@ -49,6 +49,34 @@ function texture_material(texture) {
   });
 }
 
+const cleanMaterial = (material) => {
+  // console.log("dispose material!");
+  material.dispose();
+
+  // dispose textures
+  for (const key of Object.keys(material)) {
+    const value = material[key];
+    if (value && typeof value === "object" && "minFilter" in value) {
+      //   console.log('dispose texture!')
+      value.dispose();
+    }
+  }
+};
+
+function delete_object(object) {
+  if (object.isMesh) {
+    //   console.log('dispose geometry!')
+    object.geometry.dispose();
+
+    if (object.material.isMaterial) {
+      cleanMaterial(object.material);
+    } else {
+      // an array of materials
+      for (const material of object.material) cleanMaterial(material);
+    }
+  }
+}
+
 export default {
   template: `
     <div style="position:relative">
@@ -202,6 +230,7 @@ export default {
     this.stl_loader = new STLLoader();
     this.gltf_loader = new GLTFLoader();
     this.initialized = true;
+    this.kkey = 1;
     // const connectInterval = setInterval(() => {
     //   if (window.socket.id === undefined) return;
     //   this.$emit("init", { socket_id: window.socket.id });
@@ -371,8 +400,12 @@ export default {
     delete(object_id) {
       if (!this.objects.has(object_id)) return;
       const object = this.objects.get(object_id);
+
       object.removeFromParent();
+      delete_object(object);
       this.objects.delete(object_id);
+      //   this.remove(object);
+      //   object.dispose();
       const index = this.draggable_objects.indexOf(object);
       if (index != -1) this.draggable_objects.splice(index, 1);
     },
@@ -442,8 +475,24 @@ export default {
     },
     init_objects(data) {
       if (this.initialized) {
+        // this.kkey += 1;
+        // mounted();
+        for (const [key, object] of this.objects) {
+          console.log(`ob ${0}`, object, key);
+          if (!object.isScene) {
+            object.removeFromParent();
+            delete_object(object);
+            this.objects.delete(key);
+          }
+        }
+        // this.scene.traverse((object) => {
+        //   console.log(`ob ${0}`, object);
+        //   object.removeFromParent();
+        //   delete_object(object);
+        //   this.objects.delete(object.object_id);
+        // });
       }
-
+      console.log(`pp ${0}`);
       this.initialized = true;
       for (const [
         type,
