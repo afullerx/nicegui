@@ -323,8 +323,8 @@ function createApp(elements, options) {
               window.location.reload();
             }
             document.getElementById("popup").ariaHidden = true;
-            window.initialConnection = false;
           });
+          window.initialConnection = false;
         },
         connect_error: (err) => {
           if (err.message == "timeout") {

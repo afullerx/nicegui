@@ -116,7 +116,7 @@ class Scene(Element,
         self.on('dragstart', self._handle_drag)
         self.on('dragend', self._handle_drag)
         self._props['drag_constraints'] = drag_constraints
-        self.client.on_send_state(self._handle_send_state)
+        self.client.on_init_javascript(self._handle_init_js)
 
     def on_click(self, callback: Callable[..., Any]) -> Self:
         """Add a callback to be invoked when a 3D object is clicked."""
@@ -180,9 +180,11 @@ class Scene(Element,
         await self.client.connected()
         await event.wait()
 
-    def _handle_send_state(self, socket_id):
+    def _handle_init_js(self, socket_id, initial_load):
         print(f'out: {0}')
-        # self.clear()
+        if not initial_load:
+            # self.clear()
+            pass
         self.is_initialized = True
         with self.client.individual_target(socket_id):
             # self.move_camera(duration=0)

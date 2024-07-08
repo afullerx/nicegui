@@ -171,15 +171,12 @@ async def _on_handshake(sid: str, data: Dict[str, Any]) -> Dict[str, Any]:
     client.tab_id = data['tab_id']
     await sio.enter_room(sid, client.id)
     if not await client.outbox.synchronize(data['last_message_id'], data['socket_ids']):
-        return {'success': False, 'reason': 'sync_failure'}
-    client.handle_handshake()
-    if (data['initial_connection']):
-        print(f'client.send_state: {0}')
-        client.send_state(sid)
-    else:
-        # client.send_state(sid, True)
-        pass
+        client.refresh_ui(sid)
+        client.init_javascript(sid, data['initial_connection'])
+    elif data['initial_connection']:
+        client.init_javascript(sid, data['initial_connection'])
 
+    client.handle_handshake()
     return {'success': True}
 
 

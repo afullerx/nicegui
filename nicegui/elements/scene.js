@@ -473,6 +473,7 @@ export default {
       }
       this.camera.updateProjectionMatrix();
     },
+    clear() {},
     init_objects(data) {
       if (this.initialized) {
         // this.kkey += 1;
