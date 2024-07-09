@@ -77,24 +77,28 @@ class Outbox:
     async def synchronize(self, last_message_id: int, socket_ids: List[str]) -> bool:
         """Synchronize the state of a connecting client by resending missed messages, if possible."""
         messages = []
+        success = True
         if self._history is not None:
             if self._history:
                 next_id = last_message_id + 1
                 oldest_id = self._history[0][0]
                 if oldest_id > next_id:
-                    return False
+                    success = False
+                    # return False
 
-                start = next_id - oldest_id
-                for i in range(start, len(self._history)):
-                    msg = self._history[i][2]
-                    if msg[2] == self.client.id or msg[2] in socket_ids:
-                        messages.append(msg)
+                if success:
+                    start = next_id - oldest_id
+                    for i in range(start, len(self._history)):
+                        msg = self._history[i][2]
+                        if msg[2] == self.client.id or msg[2] in socket_ids:
+                            messages.append(msg)
 
             elif last_message_id != self._message_count:
-                return False
-
+                success = False
+                # return False
+        # print(f'mmm: {0}')
         await self._emit('sync', {'target': socket_ids[-1], 'history': messages}, self.client.id)
-        return True
+        return success
 
     async def loop(self) -> None:
         """Send updates and messages to all clients in an endless loop."""

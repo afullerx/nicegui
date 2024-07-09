@@ -292,7 +292,7 @@ function createApp(elements, options) {
       window.lastMessageId = options.query.starting_message_id;
       window.syncing = true;
       window.socketIds = [];
-      window.initialConnection = true;
+      window.initialLoad = true;
       window.socket = io(url, {
         path: `${options.prefix}/_nicegui_ws/socket.io`,
         query: options.query,
@@ -312,7 +312,7 @@ function createApp(elements, options) {
             tab_id: tabId,
             last_message_id: window.lastMessageId,
             socket_ids: window.socketIds,
-            initial_connection: window.initialConnection,
+            initial_load: window.initialLoad,
           };
           window.socket.emit("handshake", args, (res) => {
             if (!res.success && res.reason === "no_client_id") {
@@ -324,7 +324,7 @@ function createApp(elements, options) {
             }
             document.getElementById("popup").ariaHidden = true;
           });
-          window.initialConnection = false;
+          window.initialLoad = false;
         },
         connect_error: (err) => {
           if (err.message == "timeout") {
@@ -364,6 +364,7 @@ function createApp(elements, options) {
         download: (msg) => download(msg.src, msg.filename, msg.media_type, options.prefix),
         notify: (msg) => Quasar.Notify.create(msg),
         sync: (msg) => {
+          console.log(`window.syncing = false ${0}`, msg.target, window.socket.id);
           if (msg.target === window.socket.id) {
             window.syncing = false;
             for (let i = 0; i < msg.history.length; i++) {
@@ -377,6 +378,7 @@ function createApp(elements, options) {
           }
         },
         fullsync: (msg) => {
+          console.log(`fullsync ${0}`);
           replaceUndefinedAttributes(msg, 0);
           this.elements = msg;
         },
@@ -386,6 +388,7 @@ function createApp(elements, options) {
       for (const [event, handler] of Object.entries(messageHandlers)) {
         window.socket.on(event, async (...args) => {
           const data = args[0];
+          //   console.log(`out ${0}`, data);
           if (data && data.hasOwnProperty("message_id")) {
             if (window.syncing || data.message_id <= window.lastMessageId) {
               return;

@@ -164,6 +164,8 @@ async def _exception_handler_500(request: Request, exception: Exception) -> Resp
 
 @sio.on('handshake')
 async def _on_handshake(sid: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    print(f'ooooooooooo: {0}')
+
     client = Client.instances.get(data['client_id'])
     if not client:
         return {'success': False, 'reason': 'no_client_id'}
@@ -171,10 +173,11 @@ async def _on_handshake(sid: str, data: Dict[str, Any]) -> Dict[str, Any]:
     client.tab_id = data['tab_id']
     await sio.enter_room(sid, client.id)
     if not await client.outbox.synchronize(data['last_message_id'], data['socket_ids']):
+        print(f'sync fail: {0}')
         client.refresh_ui(sid)
-        client.init_javascript(sid, data['initial_connection'])
-    elif data['initial_connection']:
-        client.init_javascript(sid, data['initial_connection'])
+        client.init_js_objects(sid, data['initial_load'])
+    elif data['initial_load']:
+        client.init_js_objects(sid, data['initial_load'])
 
     client.handle_handshake()
     return {'success': True}

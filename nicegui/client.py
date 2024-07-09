@@ -245,11 +245,11 @@ class Client:
         """Add a callback to be invoked when the client disconnects."""
         self.disconnect_handlers.append(handler)
 
-    def on_init_javascript(self, handler: Union[Callable[..., Any], Awaitable]) -> None:
+    def on_init_js_objects(self, handler: Union[Callable[..., Any], Awaitable]) -> None:
         """Add a callback to be invoked when the"""
         self.init_js_handlers.append(handler)
 
-    def init_javascript(self, socket_id, initial_load):
+    def init_js_objects(self, socket_id, initial_load):
         print(f'send_state: {0}')
         for t in self.init_js_handlers:
             print(f't: {0}')
@@ -260,6 +260,14 @@ class Client:
             id: element._to_dict() for id, element in self.elements.items()  # pylint: disable=protected-access
         }
         self.outbox.enqueue_message('fullsync', elements, socket_id)
+
+    async def synchronize_ui(self, target: str, last_message_id: int, socket_ids: List[str], initial_load: bool):
+        if not await self.outbox.synchronize(last_message_id, socket_ids):
+            print(f'sync fail: {0}')
+            self.refresh_ui(target)
+            self.init_js_objects(target, initial_load)
+        elif initial_load:
+            self.init_js_objects(target, initial_load)
 
     def handle_handshake(self) -> None:
         """Cancel pending disconnect task and invoke connect handlers."""

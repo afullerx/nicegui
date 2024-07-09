@@ -63,7 +63,7 @@ const cleanMaterial = (material) => {
   }
 };
 
-function delete_object(object) {
+function delete_scene_object(object) {
   if (object.isMesh) {
     //   console.log('dispose geometry!')
     object.geometry.dispose();
@@ -402,7 +402,7 @@ export default {
       const object = this.objects.get(object_id);
 
       object.removeFromParent();
-      delete_object(object);
+      //   delete_scene_object(object);
       this.objects.delete(object_id);
       //   this.remove(object);
       //   object.dispose();
@@ -473,19 +473,22 @@ export default {
       }
       this.camera.updateProjectionMatrix();
     },
-    clear() {},
+    clear() {
+      for (const [key, object] of this.objects) {
+        console.log(`ob ${0}`, object, key);
+        if (!object.isScene) {
+          object.removeFromParent();
+          //   delete_scene_object(object);
+          this.objects.delete(key);
+        }
+      }
+    },
     init_objects(data) {
+      console.log(`init_objects ${0}`);
+      this.clear();
       if (this.initialized) {
         // this.kkey += 1;
         // mounted();
-        for (const [key, object] of this.objects) {
-          console.log(`ob ${0}`, object, key);
-          if (!object.isScene) {
-            object.removeFromParent();
-            delete_object(object);
-            this.objects.delete(key);
-          }
-        }
         // this.scene.traverse((object) => {
         //   console.log(`ob ${0}`, object);
         //   object.removeFromParent();
